@@ -1,0 +1,43 @@
+#!/bin/bash
+NAME="$(basename "$0")"
+VERSION="0.4"
+
+# Item type classification
+TYPE_LOGIN=1
+TYPE_NOTE=2
+TYPE_CARD=3
+TYPE_IDENTITY=4
+
+# Clear password after N seconds (0 to disable)
+DEFAULT_CLEAR=5
+
+# Show part of the password in the notification
+DEFAULT_LOCK=900
+
+# 15 minutes, default for bitwarden apps
+DEFAULT_SHOW_PASSWORD=no
+
+# Default mode of the soft
+DEFAULT_MODE=$TYPE_LOGIN
+
+# Keyboard shortcuts
+KB_SYNC="Alt+r"
+KB_URLSEARCH="Alt+u"
+KB_NAMESEARCH="Alt+n"
+KB_FOLDERSELECT="Alt+c"
+KB_TOTPCOPY="Alt+t"
+KB_LOCK="Alt+L"
+KB_TYPEALL="Alt+1"
+KB_TYPEUSER="Alt+2"
+KB_TYPEPASS="Alt+3"
+
+KB_NOTES_NAMESEARCH="Alt+m"
+
+# Populated in parse_cli_arguments
+ROFI_OPTIONS=()
+DEDUP_MARK="(+)"
+
+# Specify what happens when pressing Enter on an item.
+# Defaults to copy_password, can be changed to (auto_type all) or (auto_type password)
+ENTER_CMD=copy_password
+

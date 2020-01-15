@@ -1,16 +1,27 @@
 #!/bin/bash
 # Rofi extension for BitWarden-cli
-NAME="$(basename "$0")"
-VERSION="0.4"
-DEFAULT_CLEAR=5
+
+# Get current directory
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink
+  DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE" # if $SOURCE was a relative symlink, we need to resolve it relative to the path where the symlink file was located
+done
+DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+
+source $DIR/options
+# source $DIR/shortcuts
+# source $DIR/filters
+# source $DIR/messages
+
+# Source helper functions
+source "$DIR/lib-bwmenu"
+
 BW_HASH=
-
-# Options
-CLEAR=$DEFAULT_CLEAR # Clear password after N seconds (0 to disable)
-SHOW_PASSWORD=no # Show part of the password in the notification
-AUTO_LOCK=900 # 15 minutes, default for bitwarden apps
-
-# Holds the available items in memory
+CLEAR=$DEFAULT_CLEAR 
+SHOW_PASSWORD=$DEFAULT_SHOW_PASSWORD
+AUTO_LOCK=$DEFAULT_LOCK
 ITEMS=
 
 # Stores which command will be used to emulate keyboard type
@@ -19,34 +30,6 @@ AUTOTYPE_MODE=
 # Stores which command will be used to deal with clipboards
 CLIPBOARD_MODE=
 
-# Specify what happens when pressing Enter on an item.
-# Defaults to copy_password, can be changed to (auto_type all) or (auto_type password)
-ENTER_CMD=copy_password
-
-# Keyboard shortcuts
-KB_SYNC="Alt+r"
-KB_URLSEARCH="Alt+u"
-KB_NAMESEARCH="Alt+n"
-KB_FOLDERSELECT="Alt+c"
-KB_TOTPCOPY="Alt+t"
-KB_LOCK="Alt+L"
-KB_TYPEALL="Alt+1"
-KB_TYPEUSER="Alt+2"
-KB_TYPEPASS="Alt+3"
-
-# Item type classification
-TYPE_LOGIN=1
-TYPE_NOTE=2
-TYPE_CARD=3
-TYPE_IDENTITY=4
-
-# Populated in parse_cli_arguments
-ROFI_OPTIONS=()
-DEDUP_MARK="(+)"
-
-# Source helper functions
-DIR="$(dirname "$(readlink -f "$0")")"
-source "$DIR/lib-bwmenu"
 
 ask_password() {
   mpw=$(rofi -dmenu -p "Master Password" -password -lines 0) || exit $?
@@ -98,9 +81,12 @@ rofi_menu() {
     -kb-custom-4 $KB_FOLDERSELECT
     -kb-custom-8 $KB_TOTPCOPY
     -kb-custom-9 $KB_LOCK
+    
+    -kb-custom-10 $KB_NOTES_NAMESEARCH
   )
 
-  msg="<b>$KB_SYNC</b>: sync | <b>$KB_URLSEARCH</b>: urls | <b>$KB_NAMESEARCH</b>: names | <b>$KB_FOLDERSELECT</b>: folders | <b>$KB_TOTPCOPY</b>: totp | <b>$KB_LOCK</b>: lock"
+  msg="<b>$KB_SYNC</b>: sync | <b>$KB_URLSEARCH</b>: urls | <b>$KB_NAMESEARCH</b>: names | <b>$KB_FOLDERSELECT</b>: folders | <b>$KB_TOTPCOPY</b>: totp | <b>$KB_LOCK</b>: lock
+<b>$KB_NOTES_NAMESEARCH</b>: notes"
 
   [[ ! -z "$AUTOTYPE_MODE" ]] && {
     actions+=(
@@ -134,6 +120,23 @@ show_items() {
     item_array="$(array_from_name "$item")"
     on_rofi_exit "$rofi_exit_code" "$item_array"
   fi
+}
+
+show_notes() {
+   if note=$(
+      echo "$ITEMS" \
+         | jq -r ".[] | select( has( \"notes\" ) and ( has ( \"login\" ) | not ) ) | \"\\(.name)\"" \
+      | dedup_lines \
+      | rofi_menu
+   ); then
+    note_array="$(array_from_name "$note")"
+    "${ENTER_CMD[@]}" "$note_array"
+  else
+    rofi_exit_code=$?
+    note_array="$(array_from_name "$note")"
+    on_rofi_exit "$rofi_exit_code" "$note_array"
+  fi
+
 }
 
 # Similar to show_items() but using the item's ID for deduplication
@@ -195,6 +198,7 @@ sync_bitwarden() {
   show_items
 }
 
+
 # Evaluate the rofi exit codes
 on_rofi_exit() {
   case "$1" in
@@ -204,6 +208,7 @@ on_rofi_exit() {
     13) show_folders;;
     17) copy_totp "$2";;
     18) lock_vault;;
+    19) show_notes;; 
     14) auto_type all "$2";;
     15) auto_type username "$2";;
     16) auto_type password "$2";;
@@ -490,6 +495,8 @@ USAGE
     esac
   done
 }
+
+notify-send "$TEST :("
 
 parse_cli_arguments "$@"
 
